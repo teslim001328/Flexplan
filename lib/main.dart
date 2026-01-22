@@ -1,19 +1,29 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flexplan/models/goal.dart';
 import 'package:flexplan/providers/goal_provider.dart';
+import 'package:flexplan/services/auth_service.dart';
 import 'package:flexplan/views/screens/create_goal_screen.dart';
 import 'package:flexplan/views/screens/goal_details_screen.dart';
 import 'package:flexplan/views/screens/analytics_screen.dart';
 import 'package:flexplan/views/screens/home_screen.dart';
+import 'package:flexplan/views/screens/login_screen.dart';
+import 'package:flexplan/views/screens/signup_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import 'package:flexplan/services/notification_service.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Note: Firebase initialization will fail if firebase_options.dart is missing.
-  // I'll wrap it in a try-catch for now to allow development of other parts.
+
+  // Initialize Notifications
+  final notificationService = NotificationService();
+  await notificationService.init();
+  await notificationService.scheduleDailyReminder();
+
   try {
     await Firebase.initializeApp();
   } catch (e) {
@@ -23,9 +33,15 @@ void main() async {
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(
-          create: (_) =>
-              GoalProvider('YOUR_AI_API_KEY'), // User will need to add this
+        Provider<AuthService>(create: (_) => AuthService()),
+        StreamProvider<User?>(
+          create: (context) => context.read<AuthService>().user,
+          initialData: null,
+        ),
+        ChangeNotifierProxyProvider<User?, GoalProvider>(
+          create: (_) => GoalProvider('YOUR_AI_API_KEY'),
+          update: (_, user, goalProvider) =>
+              goalProvider!..setUserId(user?.uid),
         ),
       ],
       child: const FlexplanApp(),
@@ -34,8 +50,24 @@ void main() async {
 }
 
 final GoRouter _router = GoRouter(
+  initialLocation: '/',
+  redirect: (context, state) {
+    final user = context.read<User?>();
+    final isLoggingIn = state.matchedLocation == '/login';
+    final isSigningUp = state.matchedLocation == '/signup';
+
+    if (user == null && !isLoggingIn && !isSigningUp) {
+      return '/login';
+    }
+    if (user != null && (isLoggingIn || isSigningUp)) {
+      return '/';
+    }
+    return null;
+  },
   routes: [
     GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+    GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+    GoRoute(path: '/signup', builder: (context, state) => const SignupScreen()),
     GoRoute(
       path: '/create-goal',
       builder: (context, state) => const CreateGoalScreen(),
@@ -59,7 +91,7 @@ class FlexplanApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color primarySeedColor = Colors.deepPurple;
+    const Color primarySeedColor = Colors.deepPurple;
 
     return MaterialApp.router(
       title: 'Flexplan',

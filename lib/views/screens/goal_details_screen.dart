@@ -68,7 +68,6 @@ class GoalDetailsScreen extends StatelessWidget {
                         currentGoal.id,
                         task.id,
                         value ?? false,
-                        'test_user_id',
                       );
                     },
                   ),

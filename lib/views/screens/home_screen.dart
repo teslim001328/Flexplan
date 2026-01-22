@@ -1,3 +1,4 @@
+import 'package:flexplan/services/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flexplan/providers/goal_provider.dart';
@@ -13,19 +14,19 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   @override
-  void initState() {
-    super.initState();
-    // Assuming a test user ID for now
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<GoalProvider>().fetchGoals('test_user_id');
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final authService = context.read<AuthService>();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Flexplan Dashboard'),
+        leading: IconButton(
+          icon: const Icon(Icons.logout),
+          tooltip: 'Logout',
+          onPressed: () async {
+            await authService.signOut();
+          },
+        ),
         actions: [
           Consumer<GoalProvider>(
             builder: (context, provider, child) {

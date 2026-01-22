@@ -38,7 +38,6 @@ class _CreateGoalScreenState extends State<CreateGoalScreen> {
         title: _titleController.text,
         description: _descriptionController.text,
         durationDays: _durationDays,
-        userId: 'test_user_id',
       );
       if (mounted) {
         context.pop();

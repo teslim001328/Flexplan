@@ -30,6 +30,14 @@ class AnalyticsScreen extends StatelessWidget {
               Icons.trending_up,
               theme.colorScheme.primary,
             ),
+            const SizedBox(height: 16),
+            _buildStatCard(
+              context,
+              'Current Streak',
+              '${provider.userStats.streak} Days',
+              Icons.local_fire_department,
+              Colors.orange,
+            ),
             const SizedBox(height: 24),
             Text(
               'Goal Completion Rates',

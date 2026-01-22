@@ -13,6 +13,7 @@ class GoalProvider with ChangeNotifier {
   List<Goal> _goals = [];
   UserStats _userStats = UserStats();
   bool _isLoading = false;
+  String? _userId;
 
   GoalProvider(String aiApiKey) : _aiService = AIService(aiApiKey);
 
@@ -20,16 +21,32 @@ class GoalProvider with ChangeNotifier {
   UserStats get userStats => _userStats;
   bool get isLoading => _isLoading;
 
-  void fetchGoals(String userId) {
-    _dbService.getGoals(userId).listen((updatedGoals) {
+  void setUserId(String? userId) {
+    if (_userId != userId) {
+      _userId = userId;
+      if (_userId != null) {
+        fetchInitialData();
+      } else {
+        _goals = [];
+        _userStats = UserStats();
+        notifyListeners();
+      }
+    }
+  }
+
+  void fetchInitialData() {
+    if (_userId == null) return;
+
+    _dbService.getGoals(_userId!).listen((updatedGoals) {
       _goals = updatedGoals;
       notifyListeners();
     });
-    fetchUserStats(userId);
+    fetchUserStats();
   }
 
-  Future<void> fetchUserStats(String userId) async {
-    final stats = await _dbService.getUserStats(userId);
+  Future<void> fetchUserStats() async {
+    if (_userId == null) return;
+    final stats = await _dbService.getUserStats(_userId!);
     if (stats != null) {
       _userStats = stats;
       notifyListeners();
@@ -40,8 +57,8 @@ class GoalProvider with ChangeNotifier {
     required String title,
     required String description,
     required int durationDays,
-    required String userId,
   }) async {
+    if (_userId == null) return;
     _isLoading = true;
     notifyListeners();
 
@@ -57,7 +74,7 @@ class GoalProvider with ChangeNotifier {
         startDate: DateTime.now(),
         endDate: DateTime.now().add(Duration(days: durationDays)),
         tasks: tasks,
-        userId: userId,
+        userId: _userId!,
       );
 
       await _dbService.saveGoal(newGoal);
@@ -69,12 +86,8 @@ class GoalProvider with ChangeNotifier {
     }
   }
 
-  Future<void> toggleTask(
-    String goalId,
-    String taskId,
-    bool isDone,
-    String userId,
-  ) async {
+  Future<void> toggleTask(String goalId, String taskId, bool isDone) async {
+    if (_userId == null) return;
     final status = isDone ? TaskStatus.done : TaskStatus.pending;
     await _dbService.updateTaskStatus(goalId, taskId, status);
 
@@ -87,14 +100,33 @@ class GoalProvider with ChangeNotifier {
         newLevel++;
       }
 
+      // Streak logic
+      int newStreak = _userStats.streak;
+      final now = DateTime.now();
+      final lastDate = _userStats.lastCheckedIn;
+
+      if (lastDate == null) {
+        newStreak = 1;
+      } else {
+        final lastDay = DateTime(lastDate.year, lastDate.month, lastDate.day);
+        final currentDay = DateTime(now.year, now.month, now.day);
+        final differenceInDays = currentDay.difference(lastDay).inDays;
+
+        if (differenceInDays == 1) {
+          newStreak++;
+        } else if (differenceInDays > 1) {
+          newStreak = 1;
+        }
+      }
+
       _userStats = UserStats(
         xp: newXp,
         level: newLevel,
-        streak: _userStats.streak, // Add streak logic if needed
-        lastCheckedIn: DateTime.now(),
+        streak: newStreak,
+        lastCheckedIn: now,
       );
 
-      await _dbService.updateUserStats(userId, _userStats);
+      await _dbService.updateUserStats(_userId!, _userStats);
       notifyListeners();
     }
   }
